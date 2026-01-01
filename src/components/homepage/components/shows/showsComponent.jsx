@@ -11,6 +11,10 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import $ from "jquery";
+import placeholderImage from "../../../../assets/placeholder-music.png";
+
+const ISO_DATE_LENGTH = 10; // YYYY-MM-DD
+const DATETIME_MIN_LENGTH = 16; // YYYY-MM-DDTHH:mm
 
 class ShowsComponent extends Component {
   state = {
@@ -26,6 +30,41 @@ class ShowsComponent extends Component {
     this.locationSearchbarInit();
   }
 
+  buildShow = (event) => {
+    const eventDateTime = event.datetime || "";
+    const eventDate = eventDateTime ? eventDateTime.slice(0, ISO_DATE_LENGTH) : "";
+    const eventTime =
+      eventDateTime && eventDateTime.length >= DATETIME_MIN_LENGTH
+        ? eventDateTime.slice(11, 16)
+        : "";
+    const artist = (event.artists && event.artists[0]) || event.artist || null;
+    const venue = event.venue || {};
+    const venueLocation = [venue.city, venue.region || venue.country]
+      .filter(Boolean)
+      .join(", ");
+    const eventImage =
+      (artist && (artist.image_url || artist.thumb_url)) ||
+      event.image_url ||
+      null;
+    const eventUrl =
+      event.url || (event.offers && event.offers[0] && event.offers[0].url) || "#";
+
+    return {
+      eventName:
+        event.name ||
+        event.title ||
+        (artist && artist.name) ||
+        (event.lineup && event.lineup[0]) ||
+        "Live Event",
+      venueName: venue.name,
+      venueLocation,
+      eventDate,
+      eventTime,
+      eventImage,
+      eventUrl,
+    };
+  };
+
   getInitialLocation() {
     getMetroArea().then((res) => {
       //console.log(res);
@@ -35,20 +74,7 @@ class ShowsComponent extends Component {
       searchByMetroAreaID(res.id).then((res) => {
         console.log(res);
         for (let i = 0; i < res.length; i++) {
-          let show = {
-            eventName: res[i].performance[0]
-              ? res[i].performance[0].displayName
-              : null,
-            venueName: res[i].venue.displayName,
-            venueLocation: res[i].location.city,
-            eventDate: res[i].start.date,
-            eventTime: res[i].start.time,
-            eventHeadlinerID: res[i].performance[0]
-              ? res[i].performance[0].artist.id
-              : null,
-            eventUrl: res[i].uri,
-          };
-          showsList.push(show);
+          showsList.push(this.buildShow(res[i]));
         }
         //console.log(showsList);
         this.setState({ showsList }, () => {
@@ -89,22 +115,7 @@ class ShowsComponent extends Component {
     searchByMetroAreaID(loc.metroArea.id).then((res) => {
       //console.log(res);
       for (let i = 0; i < res.length; i++) {
-        let show = {
-          eventName:
-            res[i].performance.length > 0
-              ? res[i].performance[0].displayName
-              : "",
-          venueName: res[i].venue.displayName,
-          venueLocation: res[i].location.city,
-          eventDate: res[i].start.date,
-          eventTime: res[i].start.time,
-          eventHeadlinerID:
-            res[i].performance.length > 0
-              ? res[i].performance[0].artist.id
-              : "",
-          eventUrl: res[i].uri,
-        };
-        showsList.push(show);
+        showsList.push(this.buildShow(res[i]));
       }
       //console.log(showsList);
       this.setState({ showsList }, () => {
@@ -132,6 +143,7 @@ class ShowsComponent extends Component {
   }
 
   translateDate(date) {
+    if (!date || date.length !== ISO_DATE_LENGTH) return "";
     const months = [
       "January",
       "February",
@@ -228,9 +240,7 @@ class ShowsComponent extends Component {
                       id="showImage"
                       style={{
                         backgroundImage: `url(${
-                          "http://images.sk-static.com/images/media/profile_images/artists/" +
-                          event.eventHeadlinerID +
-                          "/huge_avatar"
+                          event.eventImage ? event.eventImage : placeholderImage
                         })`,
                       }}
                     />
@@ -242,7 +252,11 @@ class ShowsComponent extends Component {
                     <div className="showName">{event.eventName}</div>
                     <div className="showVenue">{event.venueName}</div>
                     <div className="showLocation">{event.venueLocation}</div>
-                    <a href={event.eventUrl} target="_blank">
+                    <a
+                      href={event.eventUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <button className="buyTicketsButton">Buy Tickets</button>
                     </a>
                   </div>
@@ -256,19 +270,21 @@ class ShowsComponent extends Component {
           <button
             id="more-shows-button"
             onClick={() => this.showMoreShows(5)}
-            disabled={this.state.visibleShows.length < this.state.showsList.length &&
-            this.state.showsList.length > 0}>
+            disabled={
+              this.state.showsList.length === 0 ||
+              this.state.visibleShows.length >= this.state.showsList.length
+            }>
             See More Shows
           </button>
         </div>
         <div id="shows-section-footer" className="col-12">
           <div>Powered by</div>
-          <a href="http://www.songkick.com" target="_blank">
-            <img
-              id="songkick-logo"
-              src={require("../../../../assets/songkick.svg")}
-              alt=""
-            />
+          <a
+            href="https://www.bandsintown.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span id="bandsintown-credit">Bandsintown</span>
           </a>
         </div>
       </div>

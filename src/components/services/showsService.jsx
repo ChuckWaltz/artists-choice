@@ -1,65 +1,61 @@
 import axios from "axios";
 
-const apiKey = "07BKHybfGuAc8fjY";
+const appId = process.env.REACT_APP_BANDSINTOWN_APP_ID || "artists-choice";
+const apiBaseUrl = "https://rest.bandsintown.com";
 
-function getDate() {
-  let today = new Date();
-  let dd = today.getDate();
-  let mm = today.getMonth() + 1; //January is 0!
-  let yyyy = today.getFullYear();
-
-  if (dd < 10) dd = "0" + dd;
-  if (mm < 10) mm = "0" + mm;
-
-  today = yyyy + "-" + mm + "-" + dd;
-  return today;
-}
+// Bandsintown supports "geoip" location to resolve events based on requester IP.
+const getEventsByLocation = location => {
+  return axios
+    .get(`${apiBaseUrl}/events`, {
+      params: {
+        app_id: appId,
+        date: "upcoming",
+        location,
+      },
+    })
+    .then(res => (Array.isArray(res.data) ? res.data : []));
+};
 
 export const getMetroArea = () => {
-  console.log("getting initial location...");
-  return axios
-    .get(
-      "https://api.songkick.com/api/3.0/search/locations.json?location=clientip&apikey=" +
-        apiKey
-    )
-    .then(res => {
-      console.log(res);
-      return res.data.resultsPage.results.location[0].metroArea;
-    });
+  return getEventsByLocation("geoip").then(events => {
+    if (!events.length) {
+      return {
+        id: "geoip",
+        displayName: "Your Area",
+        state: null,
+        country: { displayName: "" },
+      };
+    }
+    const venue = events[0] && events[0].venue ? events[0].venue : {};
+    return {
+      id: "geoip",
+      displayName: venue.city || "Your Area",
+      state: venue.region ? { displayName: venue.region } : null,
+      country: venue.country ? { displayName: venue.country } : { displayName: "" },
+    };
+  });
 };
 
 export const getLocationStringResults = str => {
-  //console.log("getting location string results...");
   if (str.length > 0) {
-    return axios
-      .get(
-        "https://api.songkick.com/api/3.0/search/locations.json?query=" +
-          str +
-          "&apikey=" +
-          apiKey
-      )
-      .then(res => {
-        return res.data.resultsPage.results.location;
-      });
+    return getEventsByLocation(str).then(events => {
+      if (!events.length) return [];
+      const venue = events[0].venue || {};
+      return [
+        {
+          city: {
+            displayName: venue.city || str,
+            state: venue.region ? { displayName: venue.region } : null,
+            country: { displayName: venue.country || "" },
+          },
+          metroArea: { id: str },
+        },
+      ];
+    });
   }
+  return Promise.resolve([]);
 };
 
 export const searchByMetroAreaID = id => {
-  return axios
-    .get(
-      "https://api.songkick.com/api/3.0/metro_areas/" +
-        id +
-        "/calendar.json?apikey=" +
-        apiKey +
-        "&min_date=" +
-        getDate()
-    )
-    .then(res => {
-      console.log(res);
-      if (res.data.resultsPage.results.event) {
-        return res.data.resultsPage.results.event;
-      } else {
-        return [];
-      }
-    });
+  return getEventsByLocation(id);
 };
